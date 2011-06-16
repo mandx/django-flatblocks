@@ -73,6 +73,16 @@ class BasicFlatBlockWrapper(object):
         self.cache_time = 0
         self.tpl_name = None
         tag_name, self.slug, args = tokens[0], tokens[1], tokens[2:]
+
+        try:
+            # Split the arguments in two sections, the "core" ones
+            # and the ones for default content feature
+            with_index = args.index('with-default')
+            default_args = args[with_index:]
+            args = args[:with_index]
+        except ValueError:
+            default_args = []
+
         num_args = len(args)
         if num_args == 0:
             # Only the block name was specified
@@ -90,6 +100,34 @@ class BasicFlatBlockWrapper(object):
             self.tpl_name = args[2]
         else:
             raise template.TemplateSyntaxError, "%r tag should have between 1 and 4 arguments" % (tokens[0],)
+
+        if len(default_args):
+            # If we got arguments for default content, or, at least, the
+            # 'with-default' token was specified, parse until the end of
+            # the closing tag, and keep the parsed nodelist for later
+            # rendering
+            end_tag_name = 'end_%s' % tag_name
+            self.inner_nodelist = parser.parse((end_tag_name, ))
+            parser.delete_first_token()
+
+            # If an argument was specified after 'with-default', it is used
+            # as the flatblock's header
+            if len(default_args) == 2:
+                self.default_header = default_args[1]
+                if self.default_header[0] == self.default_header[-1] and \
+                   self.default_header[0] in ('"', "'"):
+                    self.default_header = self.default_header[1:-1]
+                    self.default_header_is_variable = False
+                else:
+                    self.default_header_is_variable = True
+            else:
+                self.default_header = None
+                self.default_header_is_variable = False
+        else:
+            self.default_header = None
+            self.default_header_is_variable = False
+            self.inner_nodelist = None
+
         # Check to see if the slug is properly double/single quoted
         if not (self.slug[0] == self.slug[-1] and self.slug[0] in ('"', "'")):
             self.is_variable = True
@@ -108,7 +146,10 @@ class BasicFlatBlockWrapper(object):
         self.prepare(parser, token)
         return FlatBlockNode(self.slug, self.is_variable, self.cache_time,
                 template_name=self.tpl_name,
-                tpl_is_variable=self.tpl_is_variable)
+                tpl_is_variable=self.tpl_is_variable,
+                default_header=self.default_header,
+                default_header_is_variable=self.default_header_is_variable,
+                default_content=self.inner_nodelist)
 
 class PlainFlatBlockWrapper(BasicFlatBlockWrapper):
     def __call__(self, parser, token):
@@ -120,7 +161,9 @@ do_plain_flatblock = PlainFlatBlockWrapper()
 
 class FlatBlockNode(template.Node):
     def __init__(self, slug, is_variable, cache_time=0, with_template=True,
-            template_name=None, tpl_is_variable=False):
+                 template_name=None, tpl_is_variable=False,
+                 default_header=None, default_header_is_variable=None,
+                 default_content=None):
         if template_name is None:
             self.template_name = 'flatblocks/flatblock.html'
         else:
@@ -133,6 +176,12 @@ class FlatBlockNode(template.Node):
         self.cache_time = cache_time
         self.with_template = with_template
 
+        self.default_header_is_variable = default_header_is_variable
+        self.default_header = template.Variable(default_header)\
+                             if default_header_is_variable \
+                             else default_header
+        self.default_content = default_content
+
     def render(self, context):
         if self.is_variable:
             real_slug = template.Variable(self.slug).resolve(context)
@@ -142,6 +191,12 @@ class FlatBlockNode(template.Node):
             real_template = self.template_name.resolve(context)
         else:
             real_template = self.template_name
+
+        if isinstance(self.default_header, template.Variable):
+            real_default_header = self.default_header.resolve(context)
+        else:
+            real_default_header = self.default_header
+
         # Eventually we want to pass the whole context to the template so that
         # users have the maximum of flexibility of what to do in there.
         if self.with_template:
@@ -160,11 +215,41 @@ class FlatBlockNode(template.Node):
                 # FLATBLOCKS_AUTOCREATE_STATIC_BLOCKS setting
                 if self.is_variable or not settings.AUTOCREATE_STATIC_BLOCKS:
                     flatblock = FlatBlock.objects.get(slug=real_slug)
+
+                    # If the flatblock exists, but its fields are empty, and
+                    # the STRICT_DEFAULT_CHECK is True, then update the fields
+                    # with the default contents.
+                    flatblock_updated = False
+                    if settings.STRICT_DEFAULT_CHECK:
+                        if not flatblock.header and real_default_header is not None:
+                            flatblock.header = real_default_header
+                            flatblock_updated = True
+                        if not flatblock.content and self.default_content:
+                            if isinstance(self.default_content, template.NodeList):
+                                real_default_contents = self.default_content.render(context)
+                            else:
+                                real_default_contents = self.default_content
+                            flatblock.content = real_default_contents
+                            flatblock_updated = True
+
+                        if flatblock_updated and settings.STRICT_DEFAULT_CHECK_UPDATE:
+                            flatblock.save()
                 else:
+                    if isinstance(self.default_content, template.NodeList):
+                        real_default_contents = self.default_content.render(context)
+                    else:
+                        real_default_contents = self.default_content
+
+                    if real_default_contents is None:
+                        real_default_contents = real_slug
+
                     flatblock, _ = FlatBlock.objects.get_or_create(
-                                      slug=real_slug,
-                                      defaults = {'content': real_slug}
-                                   )
+                        slug=real_slug,
+                        defaults = {
+                            'content': real_default_contents,
+                            'header': real_default_header,
+                        })
+
                 if self.cache_time != 0:
                     if self.cache_time is None or self.cache_time == 'None':
                         logger.debug("Caching %s for the cache's default timeout"
