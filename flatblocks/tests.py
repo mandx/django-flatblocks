@@ -3,6 +3,7 @@ from django.test import TestCase
 from django.core.cache import cache
 from django.contrib.auth.models import User
 from django import db
+from django.utils.translation import ugettext as _, get_language, activate
 
 from flatblocks.models import FlatBlock
 from flatblocks import settings
@@ -333,3 +334,93 @@ class TagDefaultTests(TestCase):
         settings.AUTOCREATE_STATIC_BLOCKS = old_setting_autocreate
         settings.STRICT_DEFAULT_CHECK = old_setting_strictcheck
         settings.STRICT_DEFAULT_CHECK_UPDATE = old_setting_strictcheckupdate
+
+class TagDefaultWithModelTranslationTests(TestCase):
+    def setUp(self):
+        FlatBlock.objects.all().delete()
+
+    def testTagDefaultTranslation_CheckStrictFieldsNoUpdate(self):
+        old_lang = get_language()
+        activate('es')
+
+        block_header = 'Header of block NEW'
+        block_header_translated = _('Header of block NEW')
+        block_content = 'This is the content of block new'
+        block_content_translated = _('This is the content of block new')
+        block_slug = 'block_default_NEW'
+
+        flatblock = FlatBlock.objects.create(slug=block_slug)
+
+        expected = u"""<div class="flatblock block-%(block_slug)s">
+
+    <h2 class="title">%(block_header)s</h2>
+
+    <div class="content">%(block_content)s</div>
+</div>""" % {'block_content': block_content_translated,
+             'block_slug': block_slug,
+             'block_header': block_header_translated, }
+        tpl = template.Template('{% load i18n flatblock_tags %}{% flatblock "' + \
+                                block_slug + '" with-default _("' + \
+                                block_header + '") %}{% trans "' + block_content + \
+                                '" %}{% end_flatblock %}')
+
+        old_setting_autocreate = settings.AUTOCREATE_STATIC_BLOCKS
+        old_setting_strictcheck = settings.STRICT_DEFAULT_CHECK
+        old_setting_strictcheckupdate = settings.STRICT_DEFAULT_CHECK_UPDATE
+        settings.STRICT_DEFAULT_CHECK = True
+        settings.STRICT_DEFAULT_CHECK_UPDATE = False
+        settings.AUTOCREATE_STATIC_BLOCKS = False
+
+        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+
+        flatblock = FlatBlock.objects.get(slug=block_slug)
+        self.assertEqual(flatblock.content, None)
+        self.assertEqual(flatblock.header, None)
+
+        settings.AUTOCREATE_STATIC_BLOCKS = old_setting_autocreate
+        settings.STRICT_DEFAULT_CHECK = old_setting_strictcheck
+        settings.STRICT_DEFAULT_CHECK_UPDATE = old_setting_strictcheckupdate
+        activate(old_lang)
+
+    def testTagDefaultTranslation_CheckStrictFieldsNoUpdate(self):
+        old_lang = get_language()
+        activate('es')
+
+        block_header = 'Header of block NEW'
+        block_header_translated = _('Header of block NEW')
+        block_content = 'This is the content of block new'
+        block_content_translated = _('This is the content of block new')
+        block_slug = 'block_default_NEW_2'
+
+        flatblock = FlatBlock.objects.create(slug=block_slug)
+
+        expected = u"""<div class="flatblock block-%(block_slug)s">
+
+    <h2 class="title">%(block_header)s</h2>
+
+    <div class="content">%(block_content)s</div>
+</div>""" % {'block_content': block_content_translated,
+             'block_slug': block_slug,
+             'block_header': block_header_translated, }
+        tpl = template.Template('{% load i18n flatblock_tags %}{% flatblock "' + \
+                                block_slug + '" with-default _("' + \
+                                block_header + '") %}{% trans "' + block_content + \
+                                '" %}{% end_flatblock %}')
+
+        old_setting_autocreate = settings.AUTOCREATE_STATIC_BLOCKS
+        old_setting_strictcheck = settings.STRICT_DEFAULT_CHECK
+        old_setting_strictcheckupdate = settings.STRICT_DEFAULT_CHECK_UPDATE
+        settings.STRICT_DEFAULT_CHECK = True
+        settings.STRICT_DEFAULT_CHECK_UPDATE = True
+        settings.AUTOCREATE_STATIC_BLOCKS = False
+
+        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+
+        flatblock = FlatBlock.objects.get(slug=block_slug)
+        self.assertEqual(flatblock.content, block_content_translated)
+        self.assertEqual(flatblock.header, block_header_translated)
+
+        settings.AUTOCREATE_STATIC_BLOCKS = old_setting_autocreate
+        settings.STRICT_DEFAULT_CHECK = old_setting_strictcheck
+        settings.STRICT_DEFAULT_CHECK_UPDATE = old_setting_strictcheckupdate
+        activate(old_lang)

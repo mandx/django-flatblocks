@@ -45,6 +45,7 @@ from django import template
 from django.template import loader
 from django.db import models
 from django.core.cache import cache
+from django.utils.encoding import force_unicode
 
 from flatblocks import settings
 
@@ -222,14 +223,14 @@ class FlatBlockNode(template.Node):
                     flatblock_updated = False
                     if settings.STRICT_DEFAULT_CHECK:
                         if not flatblock.header and real_default_header is not None:
-                            flatblock.header = real_default_header
+                            flatblock.header = force_unicode(real_default_header)
                             flatblock_updated = True
                         if not flatblock.content and self.default_content:
                             if isinstance(self.default_content, template.NodeList):
                                 real_default_contents = self.default_content.render(context)
                             else:
                                 real_default_contents = self.default_content
-                            flatblock.content = real_default_contents
+                            flatblock.content = force_unicode(real_default_contents)
                             flatblock_updated = True
 
                         if flatblock_updated and settings.STRICT_DEFAULT_CHECK_UPDATE:

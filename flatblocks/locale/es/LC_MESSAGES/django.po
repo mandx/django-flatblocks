@@ -1,0 +1,58 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the PACKAGE package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: PACKAGE VERSION\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2011-06-16 12:32-0500\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+#: models.py:15
+msgid "Slug"
+msgstr "Identificador"
+
+#: models.py:16
+msgid "A unique name used for reference in the templates"
+msgstr "Un nombre único para ser usado como referencia en las plantillas"
+
+#: models.py:18
+msgid "Header"
+msgstr "Encabezado"
+
+#: models.py:19
+msgid "An optional header for this content"
+msgstr "Encabezado opcional para este contenido"
+
+#: models.py:20
+msgid "Content"
+msgstr "Contenido"
+
+#: models.py:31
+msgid "Flat block"
+msgstr "Bloque de texto"
+
+#: models.py:32
+msgid "Flat blocks"
+msgstr "Bloques de texto"
+
+#: tests.py:340
+msgid "Header of block NEW"
+msgstr "Encabezado del bloque NUEVO"
+
+#: tests.py:341
+msgid "This is the content of block new"
+msgstr "Este es el contenido del bloque NUEVO"
+
+#: views.py:44
+msgid "You are not allowed to edit this flatblock"
+msgstr "No tiene permitido editar este bloque de texto"

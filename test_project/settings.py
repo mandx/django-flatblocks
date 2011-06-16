@@ -16,9 +16,19 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
+    'modeltranslation',
     'flatblocks',
 )
 LANGUAGE_CODE="en"
+USE_I18N = True
+gettext = lambda s: s
+LANGUAGES = (
+    ('en', gettext('English')),
+    ('es', gettext('Spanish')),
+)
+MODELTRANSLATION_TRANSLATION_REGISTRY = 'test_project.translation'
+TRANSLATION_REGISTRY = MODELTRANSLATION_TRANSLATION_REGISTRY
+
 TEMPLATE_DIRS = (
     os.path.join(PROJECT_ROOT, 'templates'),
 )
