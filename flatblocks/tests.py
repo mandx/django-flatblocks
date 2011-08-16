@@ -34,7 +34,7 @@ class BasicTests(TestCase):
         Tests if FlatBlock.save() resets the cache.
         """
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" 60 %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
         name = '%sblock' % settings.CACHE_PREFIX
         self.assertNotEquals(None, cache.get(name))
         block = FlatBlock.objects.get(slug='block')
@@ -61,11 +61,11 @@ class TagTests(TestCase):
     def testLoadingTaglib(self):
         """Tests if the taglib defined in this app can be loaded"""
         tpl = template.Template('{% load flatblock_tags %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
 
     def testExistingPlain(self):
         tpl = template.Template('{% load flatblock_tags %}{% plain_flatblock "block" %}')
-        self.assertEqual(u'CONTENT', tpl.render(template.Context({})).strip())
+        self.assertEqual(u'CONTENT', tpl.render(template.Context()).strip())
 
     def testExistingTemplate(self):
         expected = """<div class="flatblock block-block">
@@ -76,22 +76,22 @@ class TagTests(TestCase):
 </div>
 """
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" %}')
-        self.assertEqual(expected, tpl.render(template.Context({})))
+        self.assertEqual(expected, tpl.render(template.Context()))
 
     def testUsingMissingTemplate(self):
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" using "missing_template.html" %}')
         exception = template.TemplateSyntaxError
-        self.assertRaises(exception, tpl.render, template.Context({}))
+        self.assertRaises(exception, tpl.render, template.Context())
 
     def testSyntax(self):
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" 123 %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" using "flatblocks/flatblock.html" %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" 123 using "flatblocks/flatblock.html" %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
 
     def testBlockAsVariable(self):
         tpl = template.Template('{% load flatblock_tags %}{% flatblock blockvar %}')
@@ -100,6 +100,11 @@ class TagTests(TestCase):
 
 class AutoCreationTest(TestCase):
     """ Test case for block autcreation """
+    def setUp(self):
+        self.old_AUTOCREATE_STATIC_BLOCKS = settings.AUTOCREATE_STATIC_BLOCKS
+
+    def tearDown(self):
+        settings.AUTOCREATE_STATIC_BLOCKS = self.old_AUTOCREATE_STATIC_BLOCKS
 
     def testMissingStaticBlock(self):
         """Tests if a missing block with hardcoded name will be auto-created"""
@@ -108,18 +113,17 @@ class AutoCreationTest(TestCase):
     <div class="content">foo</div>
 </div>"""
         settings.AUTOCREATE_STATIC_BLOCKS = True
+        self.assertEqual(FlatBlock.objects.filter(slug='foo').count(), 0)
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "foo" %}')
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
-        self.assertEqual(FlatBlock.objects.count(), 1)
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
-        self.assertEqual(FlatBlock.objects.count(), 1)
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
+        self.assertEqual(FlatBlock.objects.filter(slug='foo').count(), 1)
 
     def testNotAutocreatedMissingStaticBlock(self):
         """Tests if a missing block with hardcoded name won't be auto-created if feature is disabled"""
         expected = u""
         settings.AUTOCREATE_STATIC_BLOCKS = False
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" %}')
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
         self.assertEqual(FlatBlock.objects.filter(slug='block').count(), 0)
 
     def testMissingVariableBlock(self):
@@ -128,43 +132,62 @@ class AutoCreationTest(TestCase):
         tpl = template.Template('{% load flatblock_tags %}{% flatblock name %}')
         self.assertEqual('', tpl.render(template.Context({'name': 'foo'})).strip())
 
-
 class TagDefaultTests(TestCase):
     def setUp(self):
-        self.testblock = FlatBlock.objects.create(
-             slug='block_default',
-             header='HEADER',
-             content='CONTENT_DEFAULT'
-        )
+        FlatBlock.objects.all().delete()
+        self.old_AUTOCREATE_STATIC_BLOCKS = settings.AUTOCREATE_STATIC_BLOCKS
+
+    def tearDown(self):
+        settings.AUTOCREATE_STATIC_BLOCKS = self.old_AUTOCREATE_STATIC_BLOCKS
 
     def testTagDefault(self):
         expected = u"""<div class="flatblock block-block_default">
 
-    <h2 class="title">HEADER</h2>
-
-    <div class="content">CONTENT_DEFAULT</div>
+    <div class="content">This is the default content</div>
 </div>"""
+
+        settings.AUTOCREATE_STATIC_BLOCKS = True
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" with-default %}This is the default content{% end_flatblock %}')
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
+        FlatBlock.objects.get(slug='block_default').delete()
 
     def testTagPlainDefault(self):
+        settings.AUTOCREATE_STATIC_BLOCKS = True
+        qs = FlatBlock.objects.filter(slug='block_default')
+        self.assertEqual(0, qs.count())
         tpl = template.Template('{% load flatblock_tags %}{% plain_flatblock "block_default" with-default %}This is the default content{% end_plain_flatblock %}')
-        self.assertEqual(u'CONTENT_DEFAULT', tpl.render(template.Context({})).strip())
+        self.assertEqual(u'This is the default content', tpl.render(template.Context()).strip())
+        self.assertEqual(1, qs.count())
+        self.assertEqual(u'This is the default content', qs[0].content)
+        self.assertEqual(None, qs[0].header)
+        qs.delete()
 
     def testUsingMissingTemplate(self):
+        settings.AUTOCREATE_STATIC_BLOCKS = True
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" using "missing_template.html" with-default %}This is the default content{% end_flatblock %}')
-        exception = template.TemplateSyntaxError
-        self.assertRaises(exception, tpl.render, template.Context({}))
+        self.assertRaises(template.TemplateSyntaxError, tpl.render, template.Context())
 
     def testSyntax(self):
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" with-default %}This is the default content{% end_flatblock %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" 123 with-default %}This is the default content{% end_flatblock %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" using "flatblocks/flatblock.html" with-default %}This is the default content{% end_flatblock %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" 123 using "flatblocks/flatblock.html" with-default %}This is the default content{% end_flatblock %}')
-        tpl.render(template.Context({}))
+        tpl.render(template.Context())
+
+        tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" with-default "header_default" %}This is the default content{% end_flatblock %}')
+        tpl.render(template.Context())
+        tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" 123 with-default "header_default" %}This is the default content{% end_flatblock %}')
+        tpl.render(template.Context())
+        tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" using "flatblocks/flatblock.html" with-default "header_default" %}This is the default content{% end_flatblock %}')
+        tpl.render(template.Context())
+        tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" 123 using "flatblocks/flatblock.html" with-default "header_default" %}This is the default content{% end_flatblock %}')
+        tpl.render(template.Context())
+
+        self.assertRaises(template.TemplateSyntaxError, template.Template, '{% load flatblock_tags %}{% flatblock "block_default" with-default header default %}This is the default content{% end_flatblock %}')
+        self.assertRaises(template.TemplateSyntaxError, template.Template, '{% load flatblock_tags %}{% flatblock "block_default" with-default "header" "default" %}This is the default content{% end_flatblock %}')
 
     def testBlockAsVariable(self):
         tpl = template.Template('{% load flatblock_tags %}{% flatblock blockvar with-default %}This is the default content{% end_flatblock %}')
@@ -181,36 +204,34 @@ class TagDefaultTests(TestCase):
                                 block_slug + '" with-default %}' + block_content + \
                                 '{% end_flatblock %}')
 
-        old_setting = settings.AUTOCREATE_STATIC_BLOCKS
         settings.AUTOCREATE_STATIC_BLOCKS = True
 
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
 
         flatblock = FlatBlock.objects.get(slug=block_slug)
         self.assertEqual(flatblock.content, block_content)
 
-        settings.AUTOCREATE_STATIC_BLOCKS = old_setting
-
     def testTagDefault_AutoCreateWithHeader(self):
-        block_header = 'Header of block new3'
-        block_content = 'This is the default content of block new3'
-        block_slug = 'block_default_new3'
+        block_header = 'Header of block new2'
+        block_content = 'This is the default content of block new2'
+        block_slug = 'block_default_new2'
         expected = u"""<div class="flatblock block-%(block_slug)s">
 
     <h2 class="title">%(block_header)s</h2>
 
     <div class="content">%(block_content)s</div>
-</div>""" % {'block_content': block_content, 'block_slug': block_slug,
+</div>""" % {'block_content': block_content,
+             'block_slug': block_slug,
              'block_header': block_header}
-        tpl = template.Template('{% load flatblock_tags %}{% flatblock "' + \
-                                block_slug + '" with-default "' + \
-                                block_header + '" %}' + block_content + \
-                                '{% end_flatblock %}')
+        tpl = template.Template(
+            '{% load flatblock_tags %}{% flatblock "' + block_slug + \
+            '" with-default "' + block_header + '" %}' + block_content + \
+            '{% end_flatblock %}')
 
         old_setting = settings.AUTOCREATE_STATIC_BLOCKS
         settings.AUTOCREATE_STATIC_BLOCKS = True
 
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
 
         flatblock = FlatBlock.objects.get(slug=block_slug)
         self.assertEqual(flatblock.content, block_content)
@@ -247,25 +268,55 @@ class TagDefaultTests(TestCase):
         settings.AUTOCREATE_STATIC_BLOCKS = old_setting
 
     def testTagDefault_DontAutoCreate(self):
-        block_content = 'This is the default content of block new2'
-        block_slug = 'block_default_new2'
-        expected = u""
+        block_content = 'This is the default content of block new4'
+        block_slug = 'block_default_new4'
+
+        expected = u'<div class="flatblock block-' + block_slug + '">' + \
+                 '\n\n    <div class="content">' + block_content + \
+                 '</div>\n</div>'
+
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "' + \
                                 block_slug + '" with-default %}' + block_content + \
                                 '{% end_flatblock %}')
 
-        old_setting = settings.AUTOCREATE_STATIC_BLOCKS
         settings.AUTOCREATE_STATIC_BLOCKS = False
 
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
         self.assertEqual(FlatBlock.objects.filter(slug=block_slug).count(), 0)
 
-        settings.AUTOCREATE_STATIC_BLOCKS = old_setting
+    def testTagDefault_TestExistingAutoCreate(self):
+        block_slug = 'block_existing'
+
+        testblock = FlatBlock.objects.create(
+             slug=block_slug,
+             header='HEADER_OF_SAVED_BLOCK',
+             content='CONTENT_OF_SAVED_BLOCK'
+        )
+
+        block_content = 'This is the new content of "block_existing"'
+        block_header = 'This is the new header of "block_existing"'
+
+        expected = u'<div class="flatblock block-block_existing">\n\n    ' + \
+                 '<h2 class="title">HEADER_OF_SAVED_BLOCK</h2>\n\n    ' + \
+                 '<div class="content">CONTENT_OF_SAVED_BLOCK</div>\n</div>'
+
+        tpl = template.Template(
+            '{% load flatblock_tags %}{% flatblock "' + block_slug + \
+            '" with-default "' + block_header + '" %}' + block_content + \
+            '{% end_flatblock %}')
+
+        settings.AUTOCREATE_STATIC_BLOCKS = True
+
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
+        qs = FlatBlock.objects.filter(slug=block_slug)
+        self.assertEqual(qs.count(), 1)
+        self.assertEqual(testblock.header, qs[0].header)
+        self.assertEqual(testblock.content, qs[0].content)
 
     def testTagDefault_CheckStrictFieldsNoUpdate(self):
-        block_header = 'Header of block NEW'
-        block_content = 'This is the content of block new'
-        block_slug = 'block_default_NEW'
+        block_header = 'Header of block NEW 5'
+        block_content = 'This is the content of block new 5'
+        block_slug = 'block_default_NEW5'
 
         flatblock = FlatBlock.objects.create(slug=block_slug)
 
@@ -288,7 +339,7 @@ class TagDefaultTests(TestCase):
         settings.STRICT_DEFAULT_CHECK_UPDATE = False
         settings.AUTOCREATE_STATIC_BLOCKS = False
 
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
 
         flatblock = FlatBlock.objects.get(slug=block_slug)
         self.assertEqual(flatblock.content, None)
@@ -299,9 +350,9 @@ class TagDefaultTests(TestCase):
         settings.STRICT_DEFAULT_CHECK_UPDATE = old_setting_strictcheckupdate
 
     def testTagDefault_CheckStrictFieldsDoUpdate(self):
-        block_header = 'Header of block NEW'
-        block_content = 'This is the content of block new'
-        block_slug = 'block_default_NEW'
+        block_header = 'Header of block NEW 6 '
+        block_content = 'This is the content of block new 6'
+        block_slug = 'block_default_NEW6'
 
         flatblock = FlatBlock.objects.create(slug=block_slug)
 
@@ -324,7 +375,7 @@ class TagDefaultTests(TestCase):
         settings.STRICT_DEFAULT_CHECK_UPDATE = True
         settings.AUTOCREATE_STATIC_BLOCKS = False
 
-        self.assertEqual(expected, tpl.render(template.Context({})).strip())
+        self.assertEqual(expected, tpl.render(template.Context()).strip())
 
         flatblock = FlatBlock.objects.get(slug=block_slug)
         self.assertEqual(flatblock.content, block_content)
