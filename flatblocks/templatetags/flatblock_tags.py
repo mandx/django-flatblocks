@@ -213,9 +213,6 @@ class FlatBlockNode(template.Node):
         else:
             real_default_contents = self.default_content
 
-        #if real_default_contents is None:
-            #real_default_contents = real_slug
-
         # Eventually we want to pass the whole context to the template so that
         # users have the maximum of flexibility of what to do in there.
         if self.with_template:
