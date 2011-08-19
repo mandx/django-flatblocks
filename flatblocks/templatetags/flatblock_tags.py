@@ -43,6 +43,7 @@ within that template.
 
 from django import template
 from django.template import loader
+from django.template import debug as template_debug
 from django.db import models
 from django.core.cache import cache
 
@@ -208,7 +209,7 @@ class FlatBlockNode(template.Node):
             real_default_header = self.default_header
 
         if isinstance(self.default_content,
-                      (template.NodeList, template.debug.DebugNodeList)):
+                      (template.NodeList, template_debug.DebugNodeList)):
             real_default_contents = self.default_content.render(context)
         else:
             real_default_contents = self.default_content
