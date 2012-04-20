@@ -42,10 +42,11 @@ within that template.
 """
 
 from django import template
+from django.contrib.sites.models import Site
+from django.core.cache import cache
+# from django.db import models
 from django.template import loader
 from django.template import debug as template_debug
-from django.db import models
-from django.core.cache import cache
 
 from flatblocks import settings
 from flatblocks.models import FlatBlock
@@ -55,6 +56,7 @@ import logging
 
 register = template.Library()
 logger = logging.getLogger(__name__)
+
 
 class BasicFlatBlockWrapper(object):
     def prepare(self, parser, token):
@@ -193,6 +195,7 @@ class FlatBlockNode(template.Node):
         self.default_content = default_content
 
     def render(self, context):
+        current_site = Site.objects.get_current()
         if self.is_variable:
             real_slug = template.Variable(self.slug).resolve(context)
         else:
@@ -236,16 +239,25 @@ class FlatBlockNode(template.Node):
                 # This behaviour can be configured using the
                 # FLATBLOCKS_AUTOCREATE_STATIC_BLOCKS setting
                 if self.is_variable or not settings.AUTOCREATE_STATIC_BLOCKS:
-                    flatblock = FlatBlock.objects.get(slug=real_slug)
+                    flatblock = FlatBlock.objects.get(slug=real_slug, site=current_site)
                 else:
-                    try:
-                        flatblock = FlatBlock.objects.get(slug=real_slug)
-                    except FlatBlock.DoesNotExist:
-                        flatblock = FlatBlock.objects.create(slug=real_slug,
-                            content=real_default_contents or real_slug,
-                            header=real_default_header)
-                        flatblock.save()
-                        flatblock_created = True
+                    # try:
+                    #     flatblock = FlatBlock.objects.get(slug=real_slug, site=current_site)
+                    # except FlatBlock.DoesNotExist:
+                    #     flatblock = FlatBlock.objects.create(
+                    #         slug=real_slug,
+                    #         content=real_default_contents or real_slug,
+                    #         header=real_default_header,
+                    #         site=current_site
+                    #     )
+                    #     flatblock.save()
+                    #     flatblock_created = True
+                    flatblock, flatblock_created = FlatBlock.objects.get_or_create(
+                        slug=real_slug, site=current_site, defaults={
+                            'content': real_default_contents or real_slug,
+                            'header': real_default_header,
+                        }
+                    )
 
                 # If the flatblock exists, but its fields are empty, and
                 # the STRICT_DEFAULT_CHECK is True, then update the fields
@@ -277,8 +289,12 @@ class FlatBlockNode(template.Node):
             return self.flatblock_output(real_template, flatblock, new_ctx)
         except FlatBlock.DoesNotExist:
             if real_default_contents:
-                flatblock = FlatBlock(slug=real_slug,
-                    content=real_default_contents, header=real_default_header)
+                flatblock = FlatBlock(
+                    slug=real_slug,
+                    content=real_default_contents,
+                    header=real_default_header,
+                    site=current_site,
+                )
                 return self.flatblock_output(real_template, flatblock, new_ctx)
             return ''
 

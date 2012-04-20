@@ -1,3 +1,4 @@
+from django.contrib.sites.models import Site
 from django.db import models
 from django.utils.translation import ugettext_lazy as _
 from django.core.cache import cache
@@ -11,7 +12,7 @@ class FlatBlock(models.Model):
     basically a piece of content with a given name (slug) and an optional
     title (header) which you can, for example, use in a sidebar of a website.
     """
-    slug = models.CharField(max_length=255, unique=True,
+    slug = models.CharField(max_length=255, db_index=True,
                 verbose_name=_('Slug'),
                 help_text=_("A unique name used for reference in the templates"))
     header = models.CharField(blank=True, null=True, max_length=255,
@@ -19,6 +20,14 @@ class FlatBlock(models.Model):
                 help_text=_("An optional header for this content"))
     content = models.TextField(verbose_name=_('Content'), blank=True,
                 null=True)
+    site = models.ForeignKey(Site, related_name='flatblocks', verbose_name=_('Site'))
+
+    class Meta:
+        verbose_name = _('Flat block')
+        verbose_name_plural = _('Flat blocks')
+        unique_together = (
+            ('slug', 'site', ),
+        )
 
     def __unicode__(self):
         return u"%s" % (self.slug,)
@@ -27,7 +36,3 @@ class FlatBlock(models.Model):
         super(FlatBlock, self).save(*args, **kwargs)
         # Now also invalidate the cache used in the templatetag
         cache.delete('%s%s' % (CACHE_PREFIX, self.slug, ))
-
-    class Meta:
-        verbose_name = _('Flat block')
-        verbose_name_plural = _('Flat blocks')

@@ -2,6 +2,7 @@ from django import template
 from django.test import TestCase
 from django.core.cache import cache
 from django.contrib.auth.models import User
+from django.contrib.sites.models import Site
 from django import db
 
 from flatblocks.models import FlatBlock
@@ -15,7 +16,8 @@ class BasicTests(TestCase):
         self.testblock = FlatBlock.objects.create(
              slug='block',
              header='HEADER',
-             content='CONTENT'
+             content='CONTENT',
+             site=Site.objects.get_current(),
         )
         self.admin = User.objects.create_superuser('admin', 'admin@localhost', 'adminpwd')
 
@@ -55,7 +57,8 @@ class TagTests(TestCase):
         self.testblock = FlatBlock.objects.create(
              slug='block',
              header='HEADER',
-             content='CONTENT'
+             content='CONTENT',
+             site=Site.objects.get_current(),
         )
 
     def testLoadingTaglib(self):
@@ -80,7 +83,7 @@ class TagTests(TestCase):
 
     def testUsingMissingTemplate(self):
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block" using "missing_template.html" %}')
-        exception = template.TemplateSyntaxError
+        exception = template.TemplateDoesNotExist
         self.assertRaises(exception, tpl.render, template.Context())
 
     def testSyntax(self):
@@ -165,7 +168,7 @@ class TagDefaultTests(TestCase):
     def testUsingMissingTemplate(self):
         settings.AUTOCREATE_STATIC_BLOCKS = True
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" using "missing_template.html" with-default %}This is the default content{% end_flatblock %}')
-        self.assertRaises(template.TemplateSyntaxError, tpl.render, template.Context())
+        self.assertRaises(template.TemplateDoesNotExist, tpl.render, template.Context())
 
     def testSyntax(self):
         tpl = template.Template('{% load flatblock_tags %}{% flatblock "block_default" with-default %}This is the default content{% end_flatblock %}')
@@ -290,7 +293,8 @@ class TagDefaultTests(TestCase):
         testblock = FlatBlock.objects.create(
              slug=block_slug,
              header='HEADER_OF_SAVED_BLOCK',
-             content='CONTENT_OF_SAVED_BLOCK'
+             content='CONTENT_OF_SAVED_BLOCK',
+             site=Site.objects.get_current(),
         )
 
         block_content = 'This is the new content of "block_existing"'
@@ -318,7 +322,8 @@ class TagDefaultTests(TestCase):
         block_content = 'This is the content of block new 5'
         block_slug = 'block_default_NEW5'
 
-        flatblock = FlatBlock.objects.create(slug=block_slug)
+        flatblock = FlatBlock.objects.create(
+            slug=block_slug, site=Site.objects.get_current())
 
         expected = u"""<div class="flatblock block-%(block_slug)s">
 
@@ -354,7 +359,10 @@ class TagDefaultTests(TestCase):
         block_content = 'This is the content of block new 6'
         block_slug = 'block_default_NEW6'
 
-        flatblock = FlatBlock.objects.create(slug=block_slug)
+        flatblock = FlatBlock.objects.create(
+            slug=block_slug,
+            site=Site.objects.get_current()
+        )
 
         expected = u"""<div class="flatblock block-%(block_slug)s">
 
