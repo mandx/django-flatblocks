@@ -1,3 +1,6 @@
+# -*- coding: utf-8 -*-
+
+from os import path
 try:
     from setuptools import setup, find_packages
 except:
@@ -5,18 +8,20 @@ except:
     use_setuptools()
     from setuptools import setup, find_packages
 
+README_RST = path.join(path.dirname(__file__), 'README.rst')
+
 setup(
     name = 'django-flatblocks',
-    version = '0.6.0',
+    version = '0.7.0',
     description = 'django-flatblocks acts like django.contrib.flatpages but '
                   'for parts of a page; like an editable help box you want '
                   'show alongside the main content.',
-    long_description = open('README.rst').read(),
+    long_description = open(README_RST).read(),
     keywords = 'django apps',
     license = 'New BSD License',
-    author = 'Horst Gutmann',
-    author_email = 'zerok@zerokspot.com',
-    url = 'http://github.com/zerok/django-flatblocks/',
+    author = u'Armando Pérez (Horst Gutmann)',
+    # author_email = 'zerok@zerokspot.com',
+    url = 'http://github.com/mandx/django-flatblocks/',
     dependency_links = [],
     classifiers = [
         'Development Status :: 3 - Alpha',
